@@ -2,10 +2,11 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import time
+import plotly.graph_objects as go
 import plotly.express as px
 
-st.set_page_config(page_title="💚 GreenCell Battery Dashboard", layout="wide", page_icon="💚")
-st.title("💚 GreenCell: Smart Battery Analyzer Dashboard")
+st.set_page_config(page_title="💚 GreenCell Dashboard", layout="wide", page_icon="💚")
+st.title("💚 GreenCell: Smart Battery Analyzer")
 
 # =========================
 # Session State
@@ -90,29 +91,44 @@ col4.metric("Hazardous 🔴", hazardous, f"{hazardous/total*100:.1f}%" if total>
 st.markdown("---")
 
 # =========================
-# Layout: Left = Battery Meters, Right = Pie Chart
+# Layout: Bar Graphs + Pie Chart
 # =========================
 if total > 0:
-    left_col, right_col = st.columns([2,1])
+    left_col, mid_col, right_col = st.columns([2,2,1])
     
-    # --- Left Column: Battery Meters ---
+    # --- OCV Bar Graph ---
     with left_col:
-        st.subheader("Battery Meters")
+        st.subheader("Open Circuit Voltage (V)")
+        fig_ocv = go.Figure()
         for idx, row in df.iterrows():
-            fill_percent = int((row['Open_Circuit_Voltage']-1.2)/0.4*100)  # Map 1.2-1.6V to 0-100%
             color = {"Reusable":"green","Recyclable":"orange","Hazardous":"red"}[row["Status"]]
-            
-            st.markdown(f"""
-            <div style="display:flex; align-items:center; margin-bottom:10px;">
-                <div style="width:100px; font-weight:bold;">{row['Battery_ID']}</div>
-                <div style="width:60px; height:25px; border:2px solid #333; border-radius:4px; position:relative; margin-right:10px;">
-                    <div style="width:{fill_percent}%; height:100%; background-color:{color}; transition: width 0.5s;"></div>
-                </div>
-                <div style="width:180px;">OCV: {row['Open_Circuit_Voltage']} V | R: {row['Internal_Resistance']} Ω | T: {row['Temperature']}°C</div>
-            </div>
-            """, unsafe_allow_html=True)
+            fig_ocv.add_trace(go.Bar(
+                x=[row["Battery_ID"]],
+                y=[row["Open_Circuit_Voltage"]],
+                marker_color=color,
+                text=[f"{row['Open_Circuit_Voltage']} V"],
+                textposition='outside'
+            ))
+        fig_ocv.update_layout(yaxis=dict(range=[0,2]), showlegend=False)
+        st.plotly_chart(fig_ocv, use_container_width=True)
     
-    # --- Right Column: Pie Chart ---
+    # --- Internal Resistance Bar Graph ---
+    with mid_col:
+        st.subheader("Internal Resistance (Ω)")
+        fig_res = go.Figure()
+        for idx, row in df.iterrows():
+            color = {"Reusable":"green","Recyclable":"orange","Hazardous":"red"}[row["Status"]]
+            fig_res.add_trace(go.Bar(
+                x=[row["Battery_ID"]],
+                y=[row["Internal_Resistance"]],
+                marker_color=color,
+                text=[f"{row['Internal_Resistance']} Ω"],
+                textposition='outside'
+            ))
+        fig_res.update_layout(yaxis=dict(range=[0,2]), showlegend=False)
+        st.plotly_chart(fig_res, use_container_width=True)
+    
+    # --- Pie Chart ---
     with right_col:
         st.subheader("Battery Status Distribution")
         status_counts = df['Status'].value_counts().reindex(['Reusable','Recyclable','Hazardous'], fill_value=0)
@@ -124,15 +140,28 @@ if total > 0:
             title="Status Distribution"
         )
         st.plotly_chart(fig_pie, use_container_width=True)
-
-st.markdown("---")
+    
+    # --- Temperature Bar Graph (Full width) ---
+    st.subheader("Temperature (°C)")
+    fig_temp = go.Figure()
+    for idx, row in df.iterrows():
+        color = {"Reusable":"green","Recyclable":"orange","Hazardous":"red"}[row["Status"]]
+        fig_temp.add_trace(go.Bar(
+            x=[row["Battery_ID"]],
+            y=[row["Temperature"]],
+            marker_color=color,
+            text=[f"{row['Temperature']} °C"],
+            textposition='outside'
+        ))
+    fig_temp.update_layout(yaxis=dict(range=[0,50]), showlegend=False)
+    st.plotly_chart(fig_temp, use_container_width=True)
 
 # =========================
 # Battery Details Table
 # =========================
 if total > 0:
     st.subheader("Battery Details")
-    icon_map = {"Reusable":"🔋","Recyclable":"🔋","Hazardous":"⚠️"}
+    icon_map = {"Reusable":"💚","Recyclable":"🟡","Hazardous":"🔴"}
     display_df = df.copy()
     display_df["Status"] = display_df["Status"].map(lambda x: f"{icon_map[x]} {x}")
     st.dataframe(display_df)
