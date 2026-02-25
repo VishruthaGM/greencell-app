@@ -3,6 +3,7 @@ import random
 import time
 import pandas as pd
 from datetime import datetime
+import matplotlib.pyplot as plt  # ✅ Added for plotting
 
 st.set_page_config(page_title="GreenCell Analyzer", layout="wide")
 
@@ -108,10 +109,19 @@ if not df.empty:
 
     with colB:
         st.markdown("### ♻ Classification Breakdown")
-        st.pyplot(df["Classification"].value_counts().plot.pie(
+
+        # Pie chart with colors
+        fig, ax = plt.subplots(figsize=(4,4))
+        colors = ["#16a34a", "#facc15", "#dc2626"]  # Reusable-green, Recyclable-yellow, Hazardous-red
+        df["Classification"].value_counts().plot.pie(
             autopct="%1.1f%%",
-            figsize=(4,4)
-        ).figure)
+            colors=colors,
+            startangle=90,
+            ax=ax
+        )
+        ax.set_ylabel("")  # remove y-label
+        ax.legend(df["Classification"].value_counts().index, loc="best")
+        st.pyplot(fig)
 
     total = len(df)
     reusable = len(df[df["Classification"].str.contains("Reusable")])
