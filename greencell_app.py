@@ -5,7 +5,7 @@ import time
 import plotly.express as px
 
 st.set_page_config(page_title="💚 GreenCell Battery Dashboard", layout="wide", page_icon="💚")
-st.title("💚 GreenCell: Battery Meter Dashboard")
+st.title("💚 GreenCell: Smart Battery Analyzer Dashboard")
 
 # =========================
 # Session State
@@ -19,7 +19,7 @@ if "battery_count" not in st.session_state:
     st.session_state.battery_count = 0
 
 # =========================
-# Simulate Battery Measurement
+# Simulate Battery
 # =========================
 def simulate_battery():
     st.session_state.battery_count += 1
@@ -49,7 +49,7 @@ def simulate_battery():
     }
 
 # =========================
-# Add Battery Button + Progress
+# Add Battery Button
 # =========================
 st.subheader("Process a New Battery")
 if st.button("Add Battery"):
@@ -90,39 +90,52 @@ col4.metric("Hazardous 🔴", hazardous, f"{hazardous/total*100:.1f}%" if total>
 st.markdown("---")
 
 # =========================
-# Fixed Pie Chart
+# Layout: Left = Battery Meters, Right = Pie Chart
 # =========================
 if total > 0:
-    status_counts = df['Status'].value_counts().reindex(['Reusable','Recyclable','Hazardous'], fill_value=0)
-    fig_pie = px.pie(
-        names=status_counts.index,
-        values=status_counts.values,
-        color=status_counts.index,
-        color_discrete_map={"Reusable":"green","Recyclable":"orange","Hazardous":"red"},
-        title="Battery Status Distribution",
-        hover_data={'Battery Count':status_counts.values}
-    )
-    st.plotly_chart(fig_pie, use_container_width=True)
+    left_col, right_col = st.columns([2,1])
+    
+    # --- Left Column: Battery Meters ---
+    with left_col:
+        st.subheader("Battery Meters")
+        for idx, row in df.iterrows():
+            fill_percent = int((row['Open_Circuit_Voltage']-1.2)/0.4*100)  # Map 1.2-1.6V to 0-100%
+            color = {"Reusable":"green","Recyclable":"orange","Hazardous":"red"}[row["Status"]]
+            
+            st.markdown(f"""
+            <div style="display:flex; align-items:center; margin-bottom:10px;">
+                <div style="width:100px; font-weight:bold;">{row['Battery_ID']}</div>
+                <div style="width:60px; height:25px; border:2px solid #333; border-radius:4px; position:relative; margin-right:10px;">
+                    <div style="width:{fill_percent}%; height:100%; background-color:{color}; transition: width 0.5s;"></div>
+                </div>
+                <div style="width:180px;">OCV: {row['Open_Circuit_Voltage']} V | R: {row['Internal_Resistance']} Ω | T: {row['Temperature']}°C</div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # --- Right Column: Pie Chart ---
+    with right_col:
+        st.subheader("Battery Status Distribution")
+        status_counts = df['Status'].value_counts().reindex(['Reusable','Recyclable','Hazardous'], fill_value=0)
+        fig_pie = px.pie(
+            names=status_counts.index,
+            values=status_counts.values,
+            color=status_counts.index,
+            color_discrete_map={"Reusable":"green","Recyclable":"orange","Hazardous":"red"},
+            title="Status Distribution"
+        )
+        st.plotly_chart(fig_pie, use_container_width=True)
 
 st.markdown("---")
 
 # =========================
-# Battery Meter Icons (HTML + CSS)
+# Battery Details Table
 # =========================
-st.subheader("Battery Meters")
-for idx, row in df.iterrows():
-    fill_percent = int((row['Open_Circuit_Voltage']-1.2)/0.4*100)  # Map 1.2-1.6V to 0-100%
-    color = {"Reusable":"green","Recyclable":"orange","Hazardous":"red"}[row["Status"]]
-    
-    st.markdown(f"""
-    <div style="display:flex; align-items:center; margin-bottom:10px;">
-        <div style="width:100px; font-weight:bold;">{row['Battery_ID']}</div>
-        <div style="width:60px; height:25px; border:2px solid #333; border-radius:4px; position:relative; margin-right:10px;">
-            <div style="width:{fill_percent}%; height:100%; background-color:{color}; transition: width 0.5s;"></div>
-        </div>
-        <div style="width:150px;">OCV: {row['Open_Circuit_Voltage']} V | R: {row['Internal_Resistance']} Ω | T: {row['Temperature']}°C</div>
-    </div>
-    """, unsafe_allow_html=True)
+if total > 0:
+    st.subheader("Battery Details")
+    icon_map = {"Reusable":"🔋","Recyclable":"🔋","Hazardous":"⚠️"}
+    display_df = df.copy()
+    display_df["Status"] = display_df["Status"].map(lambda x: f"{icon_map[x]} {x}")
+    st.dataframe(display_df)
 
 # =========================
 # Hazard Alert
