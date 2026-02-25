@@ -3,128 +3,116 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import time
-from streamlit_lottie import st_lottie
-import requests
+
+st.set_page_config(page_title="💚 GreenCell Interactive Dashboard", layout="wide", page_icon="💚")
+st.title("💚 GreenCell: Interactive Battery Health Analyzer")
 
 # =========================
-# Helper: load Lottie animation
+# Initialize session state
 # =========================
-def load_lottieurl(url: str):
-    r = requests.get(url)
-    if r.status_code != 200:
-        return None
-    return r.json()
+if "tested_batteries" not in st.session_state:
+    st.session_state.tested_batteries = pd.DataFrame(columns=[
+        "Battery_ID", "Open_Circuit_Voltage", "Load_Voltage",
+        "Current", "Temperature", "Internal_Resistance", "Status"
+    ])
+if "battery_count" not in st.session_state:
+    st.session_state.battery_count = 0
 
 # =========================
-# Page Configuration
+# Function: simulate a battery
 # =========================
-st.set_page_config(page_title="💚 GreenCell Dashboard", layout="wide", page_icon="💚")
-st.markdown("""
-<style>
-/* Card styling */
-.card {
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 2px 2px 10px #ddd;
-    margin-bottom: 15px;
-    background-color: #fff;
-}
-h1 {
-    font-weight: bold;
-    text-align: center;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# =========================
-# Intro Page (like Netflix landing)
-# =========================
-intro_animation = load_lottieurl("https://assets10.lottiefiles.com/packages/lf20_touohxv0.json") # battery animation
-st_lottie(intro_animation, height=300, key="intro")
-
-st.markdown("<h1>💚 GreenCell: Smart Battery Analyzer</h1>", unsafe_allow_html=True)
-st.markdown("### Sustainable e-waste & smart city monitoring")
-
-st.button("Enter Dashboard")  # Wait for user click
-
-# =========================
-# Simulate Battery Data
-# =========================
-num_batteries = 50
-data = {
-    'Battery_ID': [f'BAT{i+1}' for i in range(num_batteries)],
-    'Open_Circuit_Voltage': np.round(np.random.uniform(1.2, 1.6, num_batteries), 2),
-    'Load_Voltage': np.round(np.random.uniform(1.1, 1.55, num_batteries), 2),
-    'Current': np.round(np.random.uniform(0.05, 0.5, num_batteries), 2),
-    'Temperature': np.round(np.random.uniform(20, 40, num_batteries), 1)
-}
-df = pd.DataFrame(data)
-df['Internal_Resistance'] = np.round((df['Open_Circuit_Voltage'] - df['Load_Voltage']) / df['Current'], 2)
-
-# =========================
-# Classification
-# =========================
-def classify_aa(row):
-    if row['Temperature'] > 40 or row['Internal_Resistance'] > 1.0 or row['Open_Circuit_Voltage'] < 1.3:
-        return 'Hazardous'
-    elif row['Internal_Resistance'] <= 0.5 and row['Open_Circuit_Voltage'] >= 1.5:
-        return 'Reusable'
+def simulate_battery():
+    st.session_state.battery_count += 1
+    battery_id = f"BAT{st.session_state.battery_count}"
+    ocv = np.round(np.random.uniform(1.2, 1.6), 2)
+    lv = np.round(np.random.uniform(1.1, ocv), 2)
+    current = np.round(np.random.uniform(0.05, 0.5), 2)
+    temp = np.round(np.random.uniform(20, 40), 1)
+    resistance = np.round((ocv - lv)/current, 2)
+    
+    # Classification
+    if temp > 40 or resistance > 1.0 or ocv < 1.3:
+        status = "Hazardous"
+    elif resistance <= 0.5 and ocv >= 1.5:
+        status = "Reusable"
     else:
-        return 'Recyclable'
-
-df['Status'] = df.apply(classify_aa, axis=1)
+        status = "Recyclable"
+    
+    return {
+        "Battery_ID": battery_id,
+        "Open_Circuit_Voltage": ocv,
+        "Load_Voltage": lv,
+        "Current": current,
+        "Temperature": temp,
+        "Internal_Resistance": resistance,
+        "Status": status
+    }
 
 # =========================
-# Layout: Summary Cards in Grid
+# Layout: Add Battery Button + Progress Bar
 # =========================
-total = len(df)
-reusable = len(df[df['Status']=='Reusable'])
-recyclable = len(df[df['Status']=='Recyclable'])
-hazardous = len(df[df['Status']=='Hazardous'])
+st.subheader("Process a New Battery")
+if st.button("Add Battery"):
+    progress = st.progress(0)
+    for i in range(0, 101, 20):
+        time.sleep(0.2)  # simulate measurement delay
+        progress.progress(i)
+    
+    new_battery = simulate_battery()
+    st.session_state.tested_batteries = pd.concat([
+        st.session_state.tested_batteries,
+        pd.DataFrame([new_battery])
+    ])
+    st.success(f"✅ {new_battery['Battery_ID']} processed and added!")
 
-with st.container():
-    col1, col2, col3, col4 = st.columns(4)
-    for col, title, value, color in zip(
-        [col1, col2, col3, col4],
-        ["Total Batteries", "Reusable", "Recyclable", "Hazardous"],
-        [total, reusable, recyclable, hazardous],
-        ["#000", "green", "orange", "red"]
-    ):
-        col.markdown(f"""
-        <div class="card" style="text-align:center">
-            <h3 style="color:{color}">{title}</h3>
-            <h2>{value}</h2>
-        </div>
-        """, unsafe_allow_html=True)
+# =========================
+# Display Summary Cards
+# =========================
+tested_df = st.session_state.tested_batteries
+total = len(tested_df)
+reusable = len(tested_df[tested_df['Status']=="Reusable"])
+recyclable = len(tested_df[tested_df['Status']=="Recyclable"])
+hazardous = len(tested_df[tested_df['Status']=="Hazardous"])
+
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Total Batteries", total)
+col2.metric("Reusable 💚", reusable, f"{reusable/total*100:.1f}%" if total>0 else "0%")
+col3.metric("Recyclable 🟡", recyclable, f"{recyclable/total*100:.1f}%" if total>0 else "0%")
+col4.metric("Hazardous 🔴", hazardous, f"{hazardous/total*100:.1f}%" if total>0 else "0%")
 
 st.markdown("---")
 
 # =========================
-# Grid Layout for Charts & Table
+# Pie Chart: Status Distribution
 # =========================
-with st.container():
-    chart_col1, chart_col2 = st.columns([2,1])
-    
-    # Pie Chart
-    fig = px.pie(df, names='Status',
-                 color='Status', color_discrete_map={'Reusable':'green','Recyclable':'orange','Hazardous':'red'},
-                 title="Battery Status Distribution")
-    chart_col1.plotly_chart(fig, use_container_width=True)
-    
-    # Battery Table with icons
-    status_colors = {'Reusable':'💚', 'Recyclable':'🟡', 'Hazardous':'🔴'}
-    display_df = df.copy()
-    display_df['Status'] = display_df['Status'].map(lambda x: f"{status_colors[x]} {x}")
-    chart_col2.dataframe(display_df, height=500)
+if total > 0:
+    fig = px.pie(
+        tested_df, names="Status",
+        color="Status",
+        color_discrete_map={"Reusable":"green","Recyclable":"orange","Hazardous":"red"},
+        title="Battery Status Distribution"
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 # =========================
-# Analytics Cards (Voltage / Resistance / Temp)
+# Battery Table with Icons
 # =========================
-with st.container():
+if total > 0:
+    icon_map = {"Reusable":"🔋","Recyclable":"🔋","Hazardous":"⚠️"}  # use battery/alert icons
+    display_df = tested_df.copy()
+    display_df["Status"] = display_df["Status"].map(lambda x: f"{icon_map[x]} {x}")
+    st.subheader("Battery Details")
+    st.dataframe(display_df)
+
+# =========================
+# Analytics: Voltage / Resistance / Temperature
+# =========================
+if total > 0:
+    st.subheader("Battery Analytics")
     col_v, col_r, col_t = st.columns(3)
-    col_v.bar_chart(df['Open_Circuit_Voltage'])
-    col_r.bar_chart(df['Internal_Resistance'])
-    col_t.bar_chart(df['Temperature'])
+    col_v.bar_chart(tested_df['Open_Circuit_Voltage'], height=200)
+    col_r.bar_chart(tested_df['Internal_Resistance'], height=200)
+    col_t.bar_chart(tested_df['Temperature'], height=200)
 
 # =========================
 # Hazardous Alert
