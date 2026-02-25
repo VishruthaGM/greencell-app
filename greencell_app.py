@@ -6,7 +6,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="GreenCell Analyzer", layout="wide")
 
-# ===== Custom Theme =====
+# ===== Custom Theme ====
 st.markdown("""
 <style>
 .main {
