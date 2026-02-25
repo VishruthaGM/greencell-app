@@ -34,42 +34,51 @@ st.header("🔋 Battery Testing Terminal (Simulated Device)")
 if st.button("Insert & Scan Battery"):
     st.info("Battery inserted... scanning in progress ⚡")
     
+    # Progress bar
     progress_bar = st.progress(0)
-    battery_bar = st.empty()  # For battery animation
     
-    # Sensor values placeholders
-    ocv, load_v, current, resistance, temp = 0,0,0,0,0
+    # Placeholders for dynamic metrics
+    col1, col2, col3 = st.columns(3)
+    col1_metric = col1.empty()
+    col2_metric = col2.empty()
+    col3_metric = col3.empty()
     
+    col4, col5 = st.columns(2)
+    col4_metric = col4.empty()
+    col5_metric = col5.empty()
+    
+    # Battery fill bar placeholder
+    battery_bar = st.empty()
+    
+    # Simulate scanning loop
     for i in range(101):
         time.sleep(0.02)
         progress_bar.progress(i)
         
-        # Simulate sensor readings
+        # Random sensor readings
         ocv = round(random.uniform(0.8, 1.6), 2)
         load_v = round(random.uniform(0.7, 1.5), 2)
         current = round(random.uniform(0.1, 2.0), 2)
         resistance = round(random.uniform(0.05, 0.5), 2)
         temp = round(random.uniform(25, 55), 2)
         
-        # Live metrics display
-        col1, col2, col3 = st.columns(3)
-        col1.metric("OCV (V)", ocv)
-        col2.metric("Load Voltage (V)", load_v)
-        col3.metric("Temperature (°C)", temp)
-        col4, col5 = st.columns(2)
-        col4.metric("Current (A)", current)
-        col5.metric("Internal Resistance (Ω)", resistance)
+        # Update metrics dynamically
+        col1_metric.metric("OCV (V)", ocv)
+        col2_metric.metric("Load Voltage (V)", load_v)
+        col3_metric.metric("Temperature (°C)", temp)
+        col4_metric.metric("Current (A)", current)
+        col5_metric.metric("Internal Resistance (Ω)", resistance)
         
-        # Battery fill animation
-        fill_width = i  # percentage
+        # Update battery fill animation
         battery_bar.markdown(f"""
         <div class="battery-bar">
-            <div style="width:{fill_width}%; height:100%; background-color:#16a34a; border-radius:5px;"></div>
+            <div style="width:{i}%; height:100%; background-color:#16a34a; border-radius:5px;"></div>
         </div>
         """, unsafe_allow_html=True)
     
     # Health Score & Classification
     health_score = int((ocv * 40) + ((1/resistance) * 10) - (temp * 0.5))
+    
     if health_score > 70:
         classification = "Reusable 🟢"
         class_color = "#16a34a"
@@ -145,12 +154,6 @@ if not df.empty:
     hazardous = len(df[df["Classification"].str.contains("Hazardous")])
     co2_saved = reusable * 0.5
     
-    # Metrics with colors
-    def metric_color(value, max_val):
-        if value/ max_val > 0.7: return "#16a34a"
-        elif value/ max_val > 0.4: return "#facc15"
-        else: return "#dc2626"
-    
     st.markdown("### 🌍 Sustainability Impact")
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Batteries", total)
@@ -159,7 +162,6 @@ if not df.empty:
     col4.metric("Hazardous", hazardous)
     st.write(f"Estimated CO₂ Saved: {co2_saved} kg")
     
-    # Trend graph with color-coded line
     st.markdown("### 📈 Battery Health Trend")
     fig2, ax2 = plt.subplots(figsize=(6,3))
     scores = df["Health Score"].tolist()
