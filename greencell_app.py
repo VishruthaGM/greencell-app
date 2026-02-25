@@ -1,14 +1,14 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
+import plotly.graph_objects as go
 import time
 
-st.set_page_config(page_title="💚 GreenCell Interactive Dashboard", layout="wide", page_icon="💚")
+st.set_page_config(page_title="💚 GreenCell Battery Dashboard", layout="wide", page_icon="💚")
 st.title("💚 GreenCell: Interactive Battery Health Analyzer")
 
 # =========================
-# Initialize session state
+# Session state initialization
 # =========================
 if "tested_batteries" not in st.session_state:
     st.session_state.tested_batteries = pd.DataFrame(columns=[
@@ -19,7 +19,7 @@ if "battery_count" not in st.session_state:
     st.session_state.battery_count = 0
 
 # =========================
-# Function: simulate a battery
+# Simulate a battery measurement
 # =========================
 def simulate_battery():
     st.session_state.battery_count += 1
@@ -49,13 +49,13 @@ def simulate_battery():
     }
 
 # =========================
-# Layout: Add Battery Button + Progress Bar
+# Add Battery Button + Progress
 # =========================
 st.subheader("Process a New Battery")
 if st.button("Add Battery"):
     progress = st.progress(0)
-    for i in range(0, 101, 20):
-        time.sleep(0.2)  # simulate measurement delay
+    for i in range(0, 101, 25):
+        time.sleep(0.2)
         progress.progress(i)
     
     new_battery = simulate_battery()
@@ -66,14 +66,20 @@ if st.button("Add Battery"):
     st.success(f"✅ {new_battery['Battery_ID']} processed and added!")
 
 # =========================
-# Display Summary Cards
+# Prepare Data
 # =========================
-tested_df = st.session_state.tested_batteries
-total = len(tested_df)
-reusable = len(tested_df[tested_df['Status']=="Reusable"])
-recyclable = len(tested_df[tested_df['Status']=="Recyclable"])
-hazardous = len(tested_df[tested_df['Status']=="Hazardous"])
+df = st.session_state.tested_batteries
+total = len(df)
+if total > 0:
+    reusable = len(df[df['Status']=="Reusable"])
+    recyclable = len(df[df['Status']=="Recyclable"])
+    hazardous = len(df[df['Status']=="Hazardous"])
+else:
+    reusable = recyclable = hazardous = 0
 
+# =========================
+# Summary Cards
+# =========================
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Batteries", total)
 col2.metric("Reusable 💚", reusable, f"{reusable/total*100:.1f}%" if total>0 else "0%")
@@ -83,39 +89,95 @@ col4.metric("Hazardous 🔴", hazardous, f"{hazardous/total*100:.1f}%" if total>
 st.markdown("---")
 
 # =========================
-# Pie Chart: Status Distribution
+# Battery Status Pie Chart
 # =========================
 if total > 0:
-    fig = px.pie(
-        tested_df, names="Status",
-        color="Status",
-        color_discrete_map={"Reusable":"green","Recyclable":"orange","Hazardous":"red"},
-        title="Battery Status Distribution"
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    fig_pie = go.Figure(go.Pie(
+        labels=df["Status"],
+        values=[reusable, recyclable, hazardous],
+        marker=dict(colors=["green","orange","red"]),
+        hole=0.4
+    ))
+    fig_pie.update_layout(title_text="Battery Status Distribution")
+    st.plotly_chart(fig_pie, use_container_width=True)
 
 # =========================
-# Battery Table with Icons
+# Battery Meter-Style Charts
 # =========================
 if total > 0:
-    icon_map = {"Reusable":"🔋","Recyclable":"🔋","Hazardous":"⚠️"}  # use battery/alert icons
-    display_df = tested_df.copy()
-    display_df["Status"] = display_df["Status"].map(lambda x: f"{icon_map[x]} {x}")
+    st.subheader("Battery Meters")
+    # Voltage meter
+    fig_voltage = go.Figure()
+    for idx, row in df.iterrows():
+        color = {"Reusable":"green","Recyclable":"orange","Hazardous":"red"}[row["Status"]]
+        fig_voltage.add_trace(go.Bar(
+            x=[row["Battery_ID"]],
+            y=[row["Open_Circuit_Voltage"]],
+            marker_color=color,
+            text=[f"OCV: {row['Open_Circuit_Voltage']}V"],
+            textposition='outside',
+            name=row["Battery_ID"]
+        ))
+    fig_voltage.update_layout(
+        title="Open Circuit Voltage (V)",
+        yaxis=dict(range=[0,2]),
+        showlegend=False
+    )
+    
+    # Internal Resistance meter
+    fig_resistance = go.Figure()
+    for idx, row in df.iterrows():
+        color = {"Reusable":"green","Recyclable":"orange","Hazardous":"red"}[row["Status"]]
+        fig_resistance.add_trace(go.Bar(
+            x=[row["Battery_ID"]],
+            y=[row["Internal_Resistance"]],
+            marker_color=color,
+            text=[f"R: {row['Internal_Resistance']}Ω"],
+            textposition='outside',
+            name=row["Battery_ID"]
+        ))
+    fig_resistance.update_layout(
+        title="Internal Resistance (Ω)",
+        yaxis=dict(range=[0,2]),
+        showlegend=False
+    )
+    
+    # Temperature meter
+    fig_temp = go.Figure()
+    for idx, row in df.iterrows():
+        color = {"Reusable":"green","Recyclable":"orange","Hazardous":"red"}[row["Status"]]
+        fig_temp.add_trace(go.Bar(
+            x=[row["Battery_ID"]],
+            y=[row["Temperature"]],
+            marker_color=color,
+            text=[f"T: {row['Temperature']}°C"],
+            textposition='outside',
+            name=row["Battery_ID"]
+        ))
+    fig_temp.update_layout(
+        title="Temperature (°C)",
+        yaxis=dict(range=[0,50]),
+        showlegend=False
+    )
+    
+    # Display charts in 3 columns
+    col1, col2, col3 = st.columns(3)
+    col1.plotly_chart(fig_voltage, use_container_width=True)
+    col2.plotly_chart(fig_resistance, use_container_width=True)
+    col3.plotly_chart(fig_temp, use_container_width=True)
+
+# =========================
+# Battery Table
+# =========================
+if total > 0:
     st.subheader("Battery Details")
+    icon_map = {"Reusable":"🔋","Recyclable":"🔋","Hazardous":"⚠️"}
+    display_df = df.copy()
+    display_df["Status"] = display_df["Status"].map(lambda x: f"{icon_map[x]} {x}")
     st.dataframe(display_df)
 
 # =========================
-# Analytics: Voltage / Resistance / Temperature
-# =========================
-if total > 0:
-    st.subheader("Battery Analytics")
-    col_v, col_r, col_t = st.columns(3)
-    col_v.bar_chart(tested_df['Open_Circuit_Voltage'], height=200)
-    col_r.bar_chart(tested_df['Internal_Resistance'], height=200)
-    col_t.bar_chart(tested_df['Temperature'], height=200)
-
-# =========================
-# Hazardous Alert
+# Hazard Alert
 # =========================
 if hazardous > 0:
     st.warning(f"⚠️ {hazardous} hazardous batteries detected! Handle with care!")
