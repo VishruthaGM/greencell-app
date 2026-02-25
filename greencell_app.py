@@ -2,9 +2,13 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import time
+
+st.set_page_config(page_title="💚 GreenCell Real-Time Dashboard", layout="wide")
+st.title("💚 GreenCell: Smart Battery Health Real-Time Simulation")
 
 # =========================
-# Simulate AA/AAA Battery Data
+# Simulate Battery Data
 # =========================
 num_batteries = 50
 data = {
@@ -31,63 +35,51 @@ def classify_aa(row):
 df['Status'] = df.apply(classify_aa, axis=1)
 
 # =========================
-# Dashboard Layout
-# =========================
-st.set_page_config(page_title="💚 GreenCell Dashboard", layout="wide")
-st.title("💚 GreenCell: Smart Battery Health Dashboard")
+# Initialize empty dataframe for tested batteries
+tested_df = pd.DataFrame(columns=df.columns)
 
-# Summary Cards
-total = len(df)
-reusable = len(df[df['Status']=='Reusable'])
-recyclable = len(df[df['Status']=='Recyclable'])
-hazardous = len(df[df['Status']=='Hazardous'])
-
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Batteries", total)
-col2.metric("Reusable 💚", reusable, f"{reusable/total*100:.1f}%")
-col3.metric("Recyclable 🟡", recyclable, f"{recyclable/total*100:.1f}%")
-col4.metric("Hazardous 🔴", hazardous, f"{hazardous/total*100:.1f}%")
-
-st.markdown("---")
+st.subheader("Real-Time Battery Testing Simulation")
+placeholder_table = st.empty()
+placeholder_summary = st.empty()
+placeholder_chart = st.empty()
+placeholder_alert = st.empty()
 
 # =========================
-# Pie Chart
+# Simulate real-time testing
 # =========================
-st.subheader("Battery Status Distribution")
-fig = px.pie(df, names='Status', title='Reusable / Recyclable / Hazardous Batteries',
-             color='Status', color_discrete_map={'Reusable':'green','Recyclable':'yellow','Hazardous':'red'})
-st.plotly_chart(fig, use_container_width=True)
+for i in range(len(df)):
+    battery = df.iloc[i:i+1]
+    tested_df = pd.concat([tested_df, battery])
 
-# =========================
-# Detailed Table with Colored Status
-# =========================
-st.subheader("Battery Details")
-status_colors = {'Reusable':'💚', 'Recyclable':'🟡', 'Hazardous':'🔴'}
-df_display = df.copy()
-df_display['Status'] = df_display['Status'].map(lambda x: f"{status_colors[x]} {x}")
-st.dataframe(df_display)
+    # Update summary
+    total = len(tested_df)
+    reusable = len(tested_df[tested_df['Status']=='Reusable'])
+    recyclable = len(tested_df[tested_df['Status']=='Recyclable'])
+    hazardous = len(tested_df[tested_df['Status']=='Hazardous'])
 
-# =========================
-# Filter by Status
-# =========================
-st.subheader("Filter Batteries by Status")
-status_option = st.selectbox("Select Status", ['All', 'Reusable', 'Recyclable', 'Hazardous'])
-if status_option != 'All':
-    st.dataframe(df[df['Status']==status_option])
-else:
-    st.dataframe(df)
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total Tested", total)
+    col2.metric("Reusable 💚", reusable, f"{reusable/total*100:.1f}%")
+    col3.metric("Recyclable 🟡", recyclable, f"{recyclable/total*100:.1f}%")
+    col4.metric("Hazardous 🔴", hazardous, f"{hazardous/total*100:.1f}%")
 
-# =========================
-# Analytics: Voltage, Resistance, Temperature
-# =========================
-st.subheader("Battery Analytics")
-col1, col2, col3 = st.columns(3)
-col1.bar_chart(df['Open_Circuit_Voltage'])
-col2.bar_chart(df['Internal_Resistance'])
-col3.bar_chart(df['Temperature'])
+    # Update pie chart
+    fig = px.pie(tested_df, names='Status',
+                 color='Status', color_discrete_map={'Reusable':'green','Recyclable':'yellow','Hazardous':'red'},
+                 title='Battery Status Distribution')
+    placeholder_chart.plotly_chart(fig, use_container_width=True)
 
-# =========================
-# Optional: Alerts for Hazardous Batteries
-# =========================
-if hazardous > 0:
-    st.warning(f"⚠️ There are {hazardous} hazardous batteries. Handle with care!")
+    # Update table
+    status_colors = {'Reusable':'💚', 'Recyclable':'🟡', 'Hazardous':'🔴'}
+    display_df = tested_df.copy()
+    display_df['Status'] = display_df['Status'].map(lambda x: f"{status_colors[x]} {x}")
+    placeholder_table.dataframe(display_df)
+
+    # Hazard alert
+    if hazardous > 0:
+        placeholder_alert.warning(f"⚠️ {hazardous} hazardous batteries detected! Handle with care!")
+    else:
+        placeholder_alert.empty()
+
+    # Pause to simulate testing time
+    time.sleep(0.5)
