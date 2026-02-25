@@ -9,30 +9,7 @@ import plotly.express as px
 # Page Config
 # =========================
 st.set_page_config(page_title="💚 GreenCell Dashboard", layout="wide", page_icon="💚")
-st.markdown(
-    """
-    <style>
-    /* Card style */
-    .card {
-        background-color: #f9f9f9;
-        border-radius: 15px;
-        padding: 15px;
-        margin: 10px;
-        box-shadow: 3px 3px 10px rgba(0,0,0,0.2);
-        transition: transform 0.3s;
-    }
-    .card:hover {
-        transform: scale(1.03);
-    }
-    /* Highlight bar in plotly */
-    .plotly-graph-div {
-        border-radius: 10px;
-        box-shadow: 3px 3px 15px rgba(0,0,0,0.2);
-    }
-    </style>
-    """, unsafe_allow_html=True
-)
-st.title("💚 GreenCell: Smart Battery Analyzer")
+st.title("💚 GreenCell: Smart Battery Analyzer Dashboard")
 
 # =========================
 # Session State
@@ -57,7 +34,6 @@ def simulate_battery():
     temp = np.round(np.random.uniform(20, 40), 1)
     resistance = np.round((ocv - lv)/current, 2)
     
-    # Classification
     if temp > 40 or resistance > 1.0 or ocv < 1.3:
         status = "Hazardous"
     elif resistance <= 0.5 and ocv >= 1.5:
@@ -90,7 +66,7 @@ if st.button("Add Battery"):
         st.session_state.tested_batteries,
         pd.DataFrame([new_battery])
     ])
-    st.success(f"✅ {new_battery['Battery_ID']} processed and added!")
+    st.success(f"✅ {new_battery['Battery_ID']} processed!")
 
 # =========================
 # Prepare Data
@@ -99,30 +75,25 @@ df = st.session_state.tested_batteries
 total = len(df)
 
 # =========================
-# Summary Cards (Grid)
+# Summary Cards
 # =========================
-col1, col2, col3, col4 = st.columns(4)
-card_style = "card"
-
-def create_metric_card(col, title, value, delta=""):
-    col.markdown(f'<div class="{card_style}"><h3>{title}</h3><h2>{value}</h2><p>{delta}</p></div>', unsafe_allow_html=True)
-
-create_metric_card(col1, "Total Batteries", total)
 reusable = len(df[df['Status']=="Reusable"]) if total>0 else 0
 recyclable = len(df[df['Status']=="Recyclable"]) if total>0 else 0
 hazardous = len(df[df['Status']=="Hazardous"]) if total>0 else 0
 
-create_metric_card(col2, "Reusable 💚", reusable, f"{reusable/total*100:.1f}%" if total>0 else "0%")
-create_metric_card(col3, "Recyclable 🟡", recyclable, f"{recyclable/total*100:.1f}%" if total>0 else "0%")
-create_metric_card(col4, "Hazardous 🔴", hazardous, f"{hazardous/total*100:.1f}%" if total>0 else "0%")
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Total Batteries", total)
+col2.metric("Reusable 💚", reusable, f"{reusable/total*100:.1f}%" if total>0 else "0%")
+col3.metric("Recyclable 🟡", recyclable, f"{recyclable/total*100:.1f}%" if total>0 else "0%")
+col4.metric("Hazardous 🔴", hazardous, f"{hazardous/total*100:.1f}%" if total>0 else "0%")
 
 st.markdown("---")
 
 # =========================
-# Bar Graphs + Pie Chart Grid
+# Layout: Bar Graphs + Temperature + Pie Chart
 # =========================
-if total>0:
-    left_col, mid_col, right_col = st.columns([2,2,1])
+if total > 0:
+    left_col, mid_col, right_col = st.columns([2,2,2])
     
     # --- OCV Bar Graph ---
     with left_col:
@@ -137,8 +108,7 @@ if total>0:
                 text=[f"{row['Open_Circuit_Voltage']} V"],
                 textposition='outside'
             ))
-        fig_ocv.update_layout(yaxis=dict(range=[0,2]), showlegend=False, plot_bgcolor='white', 
-                              margin=dict(l=20,r=20,t=40,b=20))
+        fig_ocv.update_layout(yaxis=dict(range=[0,2]), showlegend=False)
         st.plotly_chart(fig_ocv, use_container_width=True)
     
     # --- Internal Resistance Graph ---
@@ -154,43 +124,41 @@ if total>0:
                 text=[f"{row['Internal_Resistance']} Ω"],
                 textposition='outside'
             ))
-        fig_res.update_layout(yaxis=dict(range=[0,2]), showlegend=False, plot_bgcolor='white',
-                              margin=dict(l=20,r=20,t=40,b=20))
+        fig_res.update_layout(yaxis=dict(range=[0,2]), showlegend=False)
         st.plotly_chart(fig_res, use_container_width=True)
     
-    # --- Pie Chart ---
+    # --- Temperature Graph ---
     with right_col:
-        st.subheader("📊 Battery Status Distribution")
-        status_counts = df['Status'].value_counts().reindex(['Reusable','Recyclable','Hazardous'], fill_value=0)
-        fig_pie = px.pie(
-            names=status_counts.index,
-            values=status_counts.values,
-            color=status_counts.index,
-            color_discrete_map={"Reusable":"green","Recyclable":"orange","Hazardous":"red"},
-            title="Status Distribution"
-        )
-        st.plotly_chart(fig_pie, use_container_width=True)
+        st.subheader("🌡️ Temperature (°C)")
+        fig_temp = go.Figure()
+        for idx, row in df.iterrows():
+            color = {"Reusable":"green","Recyclable":"orange","Hazardous":"red"}[row["Status"]]
+            fig_temp.add_trace(go.Bar(
+                x=[row["Battery_ID"]],
+                y=[row["Temperature"]],
+                marker_color=color,
+                text=[f"{row['Temperature']} °C"],
+                textposition='outside'
+            ))
+        fig_temp.update_layout(yaxis=dict(range=[0,50]), showlegend=False)
+        st.plotly_chart(fig_temp, use_container_width=True)
     
-    # --- Temperature Graph (Full Width) ---
-    st.subheader("🌡️ Temperature (°C)")
-    fig_temp = go.Figure()
-    for idx, row in df.iterrows():
-        color = {"Reusable":"green","Recyclable":"orange","Hazardous":"red"}[row["Status"]]
-        fig_temp.add_trace(go.Bar(
-            x=[row["Battery_ID"]],
-            y=[row["Temperature"]],
-            marker_color=color,
-            text=[f"{row['Temperature']} °C"],
-            textposition='outside'
-        ))
-    fig_temp.update_layout(yaxis=dict(range=[0,50]), showlegend=False, plot_bgcolor='white',
-                           margin=dict(l=20,r=20,t=40,b=20))
-    st.plotly_chart(fig_temp, use_container_width=True)
+    # --- Pie Chart (Below) ---
+    st.subheader("📊 Battery Status Distribution")
+    status_counts = df['Status'].value_counts().reindex(['Reusable','Recyclable','Hazardous'], fill_value=0)
+    fig_pie = px.pie(
+        names=status_counts.index,
+        values=status_counts.values,
+        color=status_counts.index,
+        color_discrete_map={"Reusable":"green","Recyclable":"orange","Hazardous":"red"},
+        title="Status Distribution"
+    )
+    st.plotly_chart(fig_pie, use_container_width=True)
 
 # =========================
 # Battery Details Table
 # =========================
-if total>0:
+if total > 0:
     st.subheader("📝 Battery Details")
     icon_map = {"Reusable":"💚","Recyclable":"🟡","Hazardous":"🔴"}
     display_df = df.copy()
@@ -200,5 +168,5 @@ if total>0:
 # =========================
 # Hazard Alert
 # =========================
-if hazardous>0:
+if hazardous > 0:
     st.warning(f"⚠️ {hazardous} hazardous batteries detected! Handle with care!")
