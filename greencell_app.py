@@ -5,7 +5,33 @@ import time
 import plotly.graph_objects as go
 import plotly.express as px
 
+# =========================
+# Page Config
+# =========================
 st.set_page_config(page_title="💚 GreenCell Dashboard", layout="wide", page_icon="💚")
+st.markdown(
+    """
+    <style>
+    /* Card style */
+    .card {
+        background-color: #f9f9f9;
+        border-radius: 15px;
+        padding: 15px;
+        margin: 10px;
+        box-shadow: 3px 3px 10px rgba(0,0,0,0.2);
+        transition: transform 0.3s;
+    }
+    .card:hover {
+        transform: scale(1.03);
+    }
+    /* Highlight bar in plotly */
+    .plotly-graph-div {
+        border-radius: 10px;
+        box-shadow: 3px 3px 15px rgba(0,0,0,0.2);
+    }
+    </style>
+    """, unsafe_allow_html=True
+)
 st.title("💚 GreenCell: Smart Battery Analyzer")
 
 # =========================
@@ -52,7 +78,7 @@ def simulate_battery():
 # =========================
 # Add Battery Button
 # =========================
-st.subheader("Process a New Battery")
+st.subheader("⚡ Process a New Battery")
 if st.button("Add Battery"):
     progress = st.progress(0)
     for i in range(0, 101, 20):
@@ -73,32 +99,34 @@ df = st.session_state.tested_batteries
 total = len(df)
 
 # =========================
-# Summary Cards
+# Summary Cards (Grid)
 # =========================
-if total > 0:
-    reusable = len(df[df['Status']=="Reusable"])
-    recyclable = len(df[df['Status']=="Recyclable"])
-    hazardous = len(df[df['Status']=="Hazardous"])
-else:
-    reusable = recyclable = hazardous = 0
-
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Batteries", total)
-col2.metric("Reusable 💚", reusable, f"{reusable/total*100:.1f}%" if total>0 else "0%")
-col3.metric("Recyclable 🟡", recyclable, f"{recyclable/total*100:.1f}%" if total>0 else "0%")
-col4.metric("Hazardous 🔴", hazardous, f"{hazardous/total*100:.1f}%" if total>0 else "0%")
+card_style = "card"
+
+def create_metric_card(col, title, value, delta=""):
+    col.markdown(f'<div class="{card_style}"><h3>{title}</h3><h2>{value}</h2><p>{delta}</p></div>', unsafe_allow_html=True)
+
+create_metric_card(col1, "Total Batteries", total)
+reusable = len(df[df['Status']=="Reusable"]) if total>0 else 0
+recyclable = len(df[df['Status']=="Recyclable"]) if total>0 else 0
+hazardous = len(df[df['Status']=="Hazardous"]) if total>0 else 0
+
+create_metric_card(col2, "Reusable 💚", reusable, f"{reusable/total*100:.1f}%" if total>0 else "0%")
+create_metric_card(col3, "Recyclable 🟡", recyclable, f"{recyclable/total*100:.1f}%" if total>0 else "0%")
+create_metric_card(col4, "Hazardous 🔴", hazardous, f"{hazardous/total*100:.1f}%" if total>0 else "0%")
 
 st.markdown("---")
 
 # =========================
-# Layout: Bar Graphs + Pie Chart
+# Bar Graphs + Pie Chart Grid
 # =========================
-if total > 0:
+if total>0:
     left_col, mid_col, right_col = st.columns([2,2,1])
     
     # --- OCV Bar Graph ---
     with left_col:
-        st.subheader("Open Circuit Voltage (V)")
+        st.subheader("🔋 Open Circuit Voltage (V)")
         fig_ocv = go.Figure()
         for idx, row in df.iterrows():
             color = {"Reusable":"green","Recyclable":"orange","Hazardous":"red"}[row["Status"]]
@@ -109,12 +137,13 @@ if total > 0:
                 text=[f"{row['Open_Circuit_Voltage']} V"],
                 textposition='outside'
             ))
-        fig_ocv.update_layout(yaxis=dict(range=[0,2]), showlegend=False)
+        fig_ocv.update_layout(yaxis=dict(range=[0,2]), showlegend=False, plot_bgcolor='white', 
+                              margin=dict(l=20,r=20,t=40,b=20))
         st.plotly_chart(fig_ocv, use_container_width=True)
     
-    # --- Internal Resistance Bar Graph ---
+    # --- Internal Resistance Graph ---
     with mid_col:
-        st.subheader("Internal Resistance (Ω)")
+        st.subheader("⚡ Internal Resistance (Ω)")
         fig_res = go.Figure()
         for idx, row in df.iterrows():
             color = {"Reusable":"green","Recyclable":"orange","Hazardous":"red"}[row["Status"]]
@@ -125,12 +154,13 @@ if total > 0:
                 text=[f"{row['Internal_Resistance']} Ω"],
                 textposition='outside'
             ))
-        fig_res.update_layout(yaxis=dict(range=[0,2]), showlegend=False)
+        fig_res.update_layout(yaxis=dict(range=[0,2]), showlegend=False, plot_bgcolor='white',
+                              margin=dict(l=20,r=20,t=40,b=20))
         st.plotly_chart(fig_res, use_container_width=True)
     
     # --- Pie Chart ---
     with right_col:
-        st.subheader("Battery Status Distribution")
+        st.subheader("📊 Battery Status Distribution")
         status_counts = df['Status'].value_counts().reindex(['Reusable','Recyclable','Hazardous'], fill_value=0)
         fig_pie = px.pie(
             names=status_counts.index,
@@ -141,8 +171,8 @@ if total > 0:
         )
         st.plotly_chart(fig_pie, use_container_width=True)
     
-    # --- Temperature Bar Graph (Full width) ---
-    st.subheader("Temperature (°C)")
+    # --- Temperature Graph (Full Width) ---
+    st.subheader("🌡️ Temperature (°C)")
     fig_temp = go.Figure()
     for idx, row in df.iterrows():
         color = {"Reusable":"green","Recyclable":"orange","Hazardous":"red"}[row["Status"]]
@@ -153,14 +183,15 @@ if total > 0:
             text=[f"{row['Temperature']} °C"],
             textposition='outside'
         ))
-    fig_temp.update_layout(yaxis=dict(range=[0,50]), showlegend=False)
+    fig_temp.update_layout(yaxis=dict(range=[0,50]), showlegend=False, plot_bgcolor='white',
+                           margin=dict(l=20,r=20,t=40,b=20))
     st.plotly_chart(fig_temp, use_container_width=True)
 
 # =========================
 # Battery Details Table
 # =========================
-if total > 0:
-    st.subheader("Battery Details")
+if total>0:
+    st.subheader("📝 Battery Details")
     icon_map = {"Reusable":"💚","Recyclable":"🟡","Hazardous":"🔴"}
     display_df = df.copy()
     display_df["Status"] = display_df["Status"].map(lambda x: f"{icon_map[x]} {x}")
@@ -169,5 +200,5 @@ if total > 0:
 # =========================
 # Hazard Alert
 # =========================
-if hazardous > 0:
+if hazardous>0:
     st.warning(f"⚠️ {hazardous} hazardous batteries detected! Handle with care!")
