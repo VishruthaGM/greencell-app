@@ -6,32 +6,42 @@ from datetime import datetime
 
 st.set_page_config(page_title="GreenCell Analyzer", layout="wide")
 
+# ===== Custom Theme =====
 st.markdown("""
-    <style>
-    .main {background-color: #f0fdf4;}
-    .stButton>button {
-        background-color: #16a34a;
-        color: white;
-        font-weight: bold;
-    }
-    </style>
+<style>
+.main {
+    background-color: #ecfdf5;
+}
+.stButton>button {
+    background-color: #15803d;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+}
+.big-font {
+    font-size:22px !important;
+    font-weight:bold;
+}
+</style>
 """, unsafe_allow_html=True)
 
 st.title("🌿 GreenCell")
-st.subheader("Smart Battery Health & Reusability Analyzer")
+st.subheader("AI-Powered Battery Health & Reusability System")
 
+# ===== Database =====
 if "database" not in st.session_state:
     st.session_state.database = pd.DataFrame(columns=[
         "Battery ID","OCV","Load Voltage","Current",
-        "Internal Resistance","Temperature","Classification","Timestamp"
+        "Internal Resistance","Temperature",
+        "Health Score","Classification","Timestamp"
     ])
 
-st.header("🔍 Battery Testing Terminal")
+st.header("🔋 Battery Testing Terminal")
 
 if st.button("Insert & Scan Battery"):
     progress = st.progress(0)
     for i in range(100):
-        time.sleep(0.02)
+        time.sleep(0.015)
         progress.progress(i+1)
 
     ocv = round(random.uniform(0.8, 1.6), 2)
@@ -40,23 +50,30 @@ if st.button("Insert & Scan Battery"):
     resistance = round(random.uniform(0.05, 0.5), 2)
     temp = round(random.uniform(25, 55), 2)
 
-    if temp > 45 or ocv < 1.0:
-        classification = "Hazardous 🔴"
-    elif ocv > 1.3 and resistance < 0.2:
-        classification = "Reusable 🟢"
-    else:
-        classification = "Recyclable 🟡"
+    # Health Score Formula
+    health_score = int((ocv * 40) + ((1/resistance) * 10) - (temp * 0.5))
 
-    st.subheader("📊 Test Results")
+    if health_score > 70:
+        classification = "Reusable 🟢"
+    elif health_score > 40:
+        classification = "Recyclable 🟡"
+    else:
+        classification = "Hazardous 🔴"
+
+    st.subheader("📊 Live Test Results")
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Open Circuit Voltage (V)", ocv)
+    col1.metric("OCV (V)", ocv)
     col2.metric("Load Voltage (V)", load_v)
     col3.metric("Temperature (°C)", temp)
 
     col4, col5 = st.columns(2)
     col4.metric("Current (A)", current)
     col5.metric("Internal Resistance (Ω)", resistance)
+
+    st.markdown("### 🔵 Battery Health Score")
+    st.progress(min(max(health_score,0),100))
+    st.markdown(f"<div class='big-font'>Score: {health_score}/100</div>", unsafe_allow_html=True)
 
     st.success(f"Final Classification: {classification}")
 
@@ -67,6 +84,7 @@ if st.button("Insert & Scan Battery"):
         "Current": current,
         "Internal Resistance": resistance,
         "Temperature": temp,
+        "Health Score": health_score,
         "Classification": classification,
         "Timestamp": datetime.now()
     }
@@ -76,13 +94,24 @@ if st.button("Insert & Scan Battery"):
         ignore_index=True
     )
 
+# ===== Dashboard =====
 st.header("☁️ Cloud Analytics Dashboard")
 
 df = st.session_state.database
 
 if not df.empty:
-    st.dataframe(df, use_container_width=True)
-    st.bar_chart(df["Classification"].value_counts())
+
+    colA, colB = st.columns([2,1])
+
+    with colA:
+        st.dataframe(df, use_container_width=True)
+
+    with colB:
+        st.markdown("### ♻ Classification Breakdown")
+        st.pyplot(df["Classification"].value_counts().plot.pie(
+            autopct="%1.1f%%",
+            figsize=(4,4)
+        ).figure)
 
     total = len(df)
     reusable = len(df[df["Classification"].str.contains("Reusable")])
@@ -90,6 +119,8 @@ if not df.empty:
 
     st.markdown("### 🌍 Sustainability Impact")
     st.write(f"Total Batteries Tested: {total}")
-    st.write(f"Estimated CO₂ Saved by Reuse: {co2_saved} kg")
+    st.write(f"Reusable Batteries: {reusable}")
+    st.write(f"Estimated CO₂ Saved: {co2_saved} kg")
+
 else:
     st.info("No batteries tested yet.")
